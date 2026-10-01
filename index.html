@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Circles vs Squares: Neon Mobile</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      margin: 0;
+      padding: 0;
+      touch-action: none;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #090a10;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      color: #fff;
+    }
+    #game-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      background: radial-gradient(circle at center, #141829 0%, #08090f 100%);
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    /* HUD Overlays */
+    .hud {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 12px 16px;
+      z-index: 5;
+    }
+    .hud-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .hud-stats {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .stat-badge {
+      background: rgba(18, 22, 36, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(8px);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .stat-badge span {
+      color: #00f2fe;
+    }
+    .bars-wrapper {
+      width: 180px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .bar-bg {
+      width: 100%;
+      height: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 5px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      position: relative;
+    }
+    .bar-fill-hp {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #ff416c, #ff4b2b);
+      transition: width 0.15s ease-out;
+    }
+    .bar-fill-xp {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #00c6ff, #0072ff);
+      transition: width 0.15s ease-out;
+    }
+    .hud-controls-top {
+      display: flex;
+      gap: 8px;
+      pointer-events: auto;
+    }
+    .btn-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: rgba(18, 22, 36, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+    }
+    .btn-icon:active {
+      transform: scale(0.92);
+      background: rgba(0, 242, 254, 0.2);
+    }
+
+    /* QTE Warning Surge Banner */
+    #surge-banner {
+      position: absolute;
+      top: 18%;
+      left: 50%;
+      transform: translateX(-50%) scale(0.8);
+      background: linear-gradient(90deg, rgba(255, 0, 85, 0.9), rgba(255, 102, 0, 0.9));
+      padding: 10px 24px;
+      border-radius: 30px;
+      border: 2px solid #fff;
+      box-shadow: 0 0 25px rgba(255, 0, 85, 0.8);
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      z-index: 10;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    }
+    #surge-banner.active {
+      opacity: 1;
+      transform: translateX(-50%) scale(1);
+    }
+
+    /* Screens & Modals */
+    .screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(8, 9, 15, 0.88);
+      backdrop-filter: blur(12px);
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+    .screen.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* Main Menu Styling */
+    .title-logo {
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: 2px;
+      text-align: center;
+      margin-bottom: 6px;
+      background: linear-gradient(135deg, #00f2fe, #4facfe, #ff0844);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 0 20px rgba(0, 242, 254, 0.3);
+    }
+    .subtitle {
+      font-size: 13px;
+      color: #a0aec0;
+      margin-bottom: 24px;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+    }
+    .menu-nav {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .btn-tab {
+      padding: 8px 18px;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: rgba(255, 255, 255, 0.05);
+      color: #8892b0;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-tab.active {
+      background: #00f2fe;
+      color: #090a10;
+      border-color: #00f2fe;
+      box-shadow: 0 0 15px rgba(0, 242, 254, 0.4);
+    }
+    .menu-panel {
+      display: none;
+      width: 100%;
+      max-width: 360px;
+      flex-direction: column;
+      align-items: center;
+    }
+    .menu-panel.active {
+      display: flex;
+    }
+    .btn-primary {
+      width: 100%;
+      max-width: 280px;
+      padding: 14px;
+      border-radius: 30px;
+      border: none;
+      background: linear-gradient(135deg, #00f2fe, #4facfe);
+      color: #090a10;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(0, 242, 254, 0.35);
+      margin-top: 10px;
+    }
+    .btn-primary:active {
+      transform: scale(0.96);
+    }
+    .stats-card {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 16px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .stat-label {
+      font-size: 10px;
+      color: #718096;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .stat-val {
+      font-size: 18px;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    /* Gacha & Shop */
+    .gacha-container {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+    .skin-preview-box {
+      width: 110px;
+      height: 110px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 2px dashed rgba(255, 255, 255, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .skin-preview-item {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      box-shadow: 0 0 15px currentColor;
+    }
+    .gacha-controls {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+    }
+    .btn-secondary {
+      flex: 1;
+      padding: 12px;
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    /* Cards Modal (Upgrades) */
+    .upgrade-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+      max-width: 340px;
+    }
+    .upgrade-card {
+      background: rgba(22, 27, 46, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      cursor: pointer;
+      transition: transform 0.15s, border-color 0.15s;
+      position: relative;
+      overflow: hidden;
+    }
+    .upgrade-card:active {
+      transform: scale(0.97);
+    }
+    .upgrade-card.common { border-color: #a0aec0; }
+    .upgrade-card.rare { border-color: #00f2fe; }
+    .upgrade-card.epic { border-color: #b000ff; }
+    .upgrade-card.legendary { border-color: #ffaa00; }
+    .upgrade-card.mythic { border-color: #ff0055; }
+    .card-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.06);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    .card-info {
+      flex: 1;
+    }
+    .card-badge {
+      font-size: 9px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 2px;
+    }
+    .card-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .card-desc {
+      font-size: 11px;
+      color: #a0aec0;
+      margin-top: 2px;
+      line-height: 1.3;
+    }
+
+    /* Joystick Area Overlay */
+    .joystick-container {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 40%;
+      pointer-events: none;
+      z-index: 6;
+      display: flex;
+      justify-content: space-between;
+      padding: 20px;
+    }
+    .joystick-zone {
+      width: 45%;
+      height: 100%;
+      pointer-events: auto;
+      position: relative;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="game-container">
+    <canvas id="canvas"></canvas>
+
+    <!-- HUD -->
+    <div class="hud" id="hud">
+      <div class="hud-top">
+        <div class="hud-stats">
+          <div class="bars-wrapper">
+            <div class="bar-bg"><div class="bar-fill-hp" id="hp-bar"></div></div>
+            <div class="bar-bg"><div class="bar-fill-xp" id="xp-bar"></div></div>
+          </div>
+          <div style="display: flex; gap: 6px; margin-top: 4px;">
+            <div class="stat-badge">LVL <span id="hud-lvl">1</span></div>
+            <div class="stat-badge">KILLS <span id="hud-kills">0</span></div>
+            <div class="stat-badge" style="border-color: rgba(255,0,85,0.4);">
+              BUFF <span id="hud-mult" style="color:#ff0055;">x1.00</span>
+            </div>
+          </div>
+        </div>
+        <div class="hud-controls-top">
+          <button class="btn-icon" id="btn-audio">🔊</button>
+          <button class="btn-icon" id="btn-pause">⏸</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Surge Banner -->
+    <div id="surge-banner">⚡ SURGE WARNING: GIMMICK SQUARES ⚡</div>
+
+    <!-- Joystick Zones -->
+    <div class="joystick-container">
+      <div class="joystick-zone" id="touch-left"></div>
+      <div class="joystick-zone" id="touch-right"></div>
+    </div>
+
+    <!-- MAIN MENU SCREEN -->
+    <div class="screen active" id="screen-menu">
+      <div class="title-logo">CIRCLES vs SQUARES</div>
+      <div class="subtitle">Neon Mobile Edition</div>
+
+      <div class="menu-nav">
+        <button class="btn-tab active" data-target="panel-play">PLAY</button>
+        <button class="btn-tab" data-target="panel-shop">COSMETICS</button>
+        <button class="btn-tab" data-target="panel-records">RECORDS</button>
+      </div>
+
+      <!-- PLAY PANEL -->
+      <div class="menu-panel active" id="panel-play">
+        <div class="stats-card">
+          <div class="stat-item">
+            <div class="stat-label">Coins</div>
+            <div class="stat-val" id="menu-coins" style="color: #ffd700;">0</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Best Kills</div>
+            <div class="stat-val" id="menu-best-kills">0</div>
+          </div>
+        </div>
+        <button class="btn-primary" id="btn-start">START MATCH</button>
+      </div>
+
+      <!-- SHOP PANEL -->
+      <div class="menu-panel" id="panel-shop">
+        <div class="gacha-container">
+          <div class="skin-preview-box">
+            <div class="skin-preview-item" id="skin-preview"></div>
+          </div>
+          <div style="text-align: center;">
+            <div id="skin-name" style="font-weight: 800; font-size: 16px;">Default Circle</div>
+            <div id="skin-rarity" style="font-size: 11px; color: #a0aec0; text-transform: uppercase;">Common</div>
+          </div>
+          <div class="gacha-controls">
+            <button class="btn-secondary" id="btn-roll">ROLL (100 Coins)</button>
+            <button class="btn-secondary" id="btn-equip">EQUIP</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- RECORDS PANEL -->
+      <div class="menu-panel" id="panel-records">
+        <div class="stats-card" style="grid-template-columns: 1fr;">
+          <div class="stat-item" style="margin-bottom: 10px;">
+            <div class="stat-label">Total Lifetime Kills</div>
+            <div class="stat-val" id="rec-total-kills">0</div>
+          </div>
+          <div class="stat-item" style="margin-bottom: 10px;">
+            <div class="stat-label">Max Level Reached</div>
+            <div class="stat-val" id="rec-max-lvl">1</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Longest Survival</div>
+            <div class="stat-val" id="rec-max-time">00:00</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LEVEL UP UPGRADE MODAL -->
+    <div class="screen" id="screen-upgrade">
+      <div style="font-size: 22px; font-weight: 900; color: #00f2fe; margin-bottom: 4px;">LEVEL UP!</div>
+      <div style="font-size: 12px; color: #a0aec0; margin-bottom: 16px;">Choose an enhancement</div>
+      <div class="upgrade-cards" id="upgrade-cards-container"></div>
+    </div>
+
+    <!-- PAUSE SCREEN -->
+    <div class="screen" id="screen-pause">
+      <div style="font-size: 26px; font-weight: 900; margin-bottom: 20px;">PAUSED</div>
+      <div style="display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 240px;">
+        <button class="btn-primary" id="btn-resume">RESUME</button>
+        <button class="btn-secondary" id="btn-restart">RESTART</button>
+        <button class="btn-secondary" id="btn-quit">MAIN MENU</button>
+      </div>
+    </div>
+
+    <!-- GAME OVER SCREEN -->
+    <div class="screen" id="screen-gameover">
+      <div style="font-size: 28px; font-weight: 900; color: #ff0055; margin-bottom: 6px;">SYSTEM FAILURE</div>
+      <div style="font-size: 13px; color: #a0aec0; margin-bottom: 20px;">Your circle was overwhelmed</div>
+      <div class="stats-card" style="width: 100%; max-width: 280px; margin-bottom: 20px;">
+        <div class="stat-item">
+          <div class="stat-label">Kills</div>
+          <div class="stat-val" id="go-kills">0</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Coins Earned</div>
+          <div class="stat-val" id="go-coins" style="color: #ffd700;">+0</div>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 280px;">
+        <button class="btn-primary" id="btn-retry">TRY AGAIN</button>
+        <button class="btn-secondary" id="btn-go-menu">MAIN MENU</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // --- SYNTH AUDIO ENGINE ---
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.muted = false;
+        this.isPlayingBGM = false;
+      }
+      init() {
+        if (!this.ctx) {
+          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+      }
+      playShoot() {
+        if (this.muted || !this.ctx) return;
+        let osc = this.ctx.createOscillator();
+        let gain = this.ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(400, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(80, this.ctx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.08);
+      }
+      playHit() {
+        if (this.muted || !this.ctx) return;
+        let osc = this.ctx.createOscillator();
+        let gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(120, this.ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(30, this.ctx.currentTime + 0.05);
+        gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.05);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.05);
+      }
+      playLevelUp() {
+        if (this.muted || !this.ctx) return;
+        const notes = [261.63, 329.63, 392.00, 523.25];
+        notes.forEach((freq, idx) => {
+          let osc = this.ctx.createOscillator();
+          let gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime + idx * 0.06);
+          gain.gain.setValueAtTime(0.2, this.ctx.currentTime + idx * 0.06);
+          gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + idx * 0.06 + 0.15);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(this.ctx.currentTime + idx * 0.06);
+          osc.stop(this.ctx.currentTime + idx * 0.06 + 0.15);
+        });
+      }
+    }
+    const audio = new SoundEngine();
+
+    // --- COSMETICS DATA & GACHA ---
+    const SKINS = [
+      { id: 'default', name: 'Neon Circle', color: '#00f2fe', rarity: 'common' },
+      { id: 'ruby', name: 'Ruby Core', color: '#ff0055', rarity: 'common' },
+      { id: 'emerald', name: 'Emerald Pulse', color: '#00ff88', rarity: 'rare' },
+      { id: 'amber', name: 'Amber Nova', color: '#ffaa00', rarity: 'rare' },
+      { id: 'void', name: 'Void Orb', color: '#b000ff', rarity: 'epic' },
+      { id: 'solar', name: 'Solar Flare', color: '#fffb00', rarity: 'legendary' },
+      { id: 'cyber', name: 'Cyber Grid', color: '#00ffff', rarity: 'mythic' }
+    ];
+
+    let playerStats = {
+      coins: 0,
+      bestKills: 0,
+      totalKills: 0,
+      maxLvl: 1,
+      maxTime: 0,
+      unlockedSkins: ['default'],
+      equippedSkin: 'default'
+    };
+
+    function loadSavedStats() {
+      let saved = localStorage.getItem('cvs_neon_save');
+      if (saved) {
+        try { Object.assign(playerStats, JSON.parse(saved)); } catch(e){}
+      }
+      updateMenuUI();
+    }
+    function saveStats() {
+      localStorage.setItem('cvs_neon_save', JSON.stringify(playerStats));
+      updateMenuUI();
+    }
+
+    function updateMenuUI() {
+      document.getElementById('menu-coins').innerText = playerStats.coins;
+      document.getElementById('menu-best-kills').innerText = playerStats.bestKills;
+      document.getElementById('rec-total-kills').innerText = playerStats.totalKills;
+      document.getElementById('rec-max-lvl').innerText = playerStats.maxLvl;
+      
+      let mins = Math.floor(playerStats.maxTime / 60);
+      let secs = playerStats.maxTime % 60;
+      document.getElementById('rec-max-time').innerText = `${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+    }
+
+    // --- GAME ENGINE SETUP ---
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // GAME STATE VARIABLES
+    let gameActive = false;
+    let isPaused = false;
+    let matchTime = 0;
+    let kills = 0;
+    let level = 1;
+    let xp = 0;
+    let xpToNext = 15;
+    let diffMult = 1.0;
+    let matchTimerInterval = null;
+
+    // JOYSTICKS STATE
+    let joyLeft = { active: false, id: null, startX: 0, startY: 0, curX: 0, curY: 0, dirX: 0, dirY: 0 };
+    let joyRight = { active: false, id: null, startX: 0, startY: 0, curX: 0, curY: 0, dirX: 0, dirY: 0 };
+
+    // PLAYER ENTITY
+    const player = {
+      x: 0, y: 0,
+      radius: 16,
+      color: '#00f2fe',
+      speed: 4.2,
+      hp: 100,
+      maxHp: 100,
+      dmgMult: 1,
+      rateMult: 1,
+      cooldown: 0,
+      weapon: { count: 1, spread: 0.02, fireRate: 14, damage: 15, speed: 10 }
+    };
+
+    let bullets = [];
+    let enemies = [];
+    let particles = [];
+    let floatTexts = [];
+
+    // --- UPGRADES GENERATOR ---
+    function generateUpgrades() {
+      const rarities = [
+        { type: 'common', weight: 60, mult: 1 },
+        { type: 'rare', weight: 25, mult: 1.5 },
+        { type: 'epic', weight: 10, mult: 2.2 },
+        { type: 'legendary', weight: 4, mult: 3.2 },
+        { type: 'mythic', weight: 1, mult: 5 }
+      ];
+
+      function pickRarity() {
+        let rand = Math.random() * 100;
+        let sum = 0;
+        for (let r of rarities) {
+          sum += r.weight;
+          if (rand <= sum) return r;
+        }
+        return rarities[0];
+      }
+
+      let choices = [];
+      for (let i = 0; i < 3; i++) {
+        let r = pickRarity();
+        let isWeapon = Math.random() < 0.4;
+
+        if (isWeapon) {
+          let count = Math.min(7, Math.floor(1 + r.mult));
+          let damage = Math.floor(10 * r.mult);
+          let rate = Math.max(4, Math.floor(16 / (1 + r.mult * 0.2)));
+          choices.push({
+            category: 'weapon',
+            rarity: r.type,
+            title: `${r.type.toUpperCase()} Blaster`,
+            desc: `Fires ${count} shots. ${damage} Dmg per projectile.`,
+            apply: () => {
+              player.weapon = { count, spread: 0.08 + count * 0.02, fireRate: rate, damage, speed: 11 };
+            }
+          });
+        } else {
+          let statTypes = [
+            { name: 'Max Health', fn: () => { player.maxHp += 20 * r.mult; player.hp += 20 * r.mult; } },
+            { name: 'Movement Speed', fn: () => { player.speed += 0.4 * r.mult; } },
+            { name: 'Damage Output', fn: () => { player.dmgMult += 0.15 * r.mult; } },
+            { name: 'Fire Rate Boost', fn: () => { player.rateMult += 0.15 * r.mult; } }
+          ];
+          let st = statTypes[Math.floor(Math.random() * statTypes.length)];
+          choices.push({
+            category: 'buff',
+            rarity: r.type,
+            title: `${st.name} +${Math.floor(15 * r.mult)}%`,
+            desc: `Enhances your core operational stats.`,
+            apply: st.fn
+          });
+        }
+      }
+      return choices;
+    }
+
+    function showUpgradeModal() {
+      isPaused = true;
+      audio.playLevelUp();
+      const container = document.getElementById('upgrade-cards-container');
+      container.innerHTML = '';
+      
+      let choices = generateUpgrades();
+      choices.forEach(opt => {
+        let card = document.createElement('div');
+        card.className = `upgrade-card ${opt.rarity}`;
+        card.innerHTML = `
+          <div class="card-icon">${opt.category === 'weapon' ? '🔫' : '⚡'}</div>
+          <div class="card-info">
+            <div class="card-badge" style="color:currentColor">${opt.rarity} ${opt.category}</div>
+            <div class="card-title">${opt.title}</div>
+            <div class="card-desc">${opt.desc}</div>
+          </div>
+        `;
+        card.onclick = () => {
+          opt.apply();
+          document.getElementById('screen-upgrade').classList.remove('active');
+          isPaused = false;
+        };
+        container.appendChild(card);
+      });
+
+      document.getElementById('screen-upgrade').classList.add('active');
+    }
+
+    // --- ENEMY SPAWNING (BALANCED) ---
+    function spawnEnemy() {
+      if (!gameActive || isPaused || enemies.length > 50) return;
+
+      let x, y;
+      if (Math.random() < 0.5) {
+        x = Math.random() < 0.5 ? -30 : canvas.width + 30;
+        y = Math.random() * canvas.height;
+      } else {
+        x = Math.random() * canvas.width;
+        y = Math.random() < 0.5 ? -30 : canvas.height + 30;
+      }
+
+      // Early Game Squishy Balance: Low starting HP
+      let baseHp = 10 + Math.floor(matchTime * 0.2) * diffMult;
+      let size = 22 + Math.random() * 8;
+      let speed = (1.2 + Math.random() * 0.8) * Math.min(2.0, diffMult);
+
+      let type = 'normal';
+      let color = '#ff3366';
+
+      // Surge Gimmicks
+      let rand = Math.random();
+      if (rand < 0.08) {
+        type = 'dasher';
+        color = '#ffaa00';
+        speed *= 1.8;
+        baseHp *= 0.6;
+      } else if (rand < 0.14) {
+        type = 'splitter';
+        color = '#00ffcc';
+        size *= 1.2;
+        baseHp *= 1.4;
+      }
+
+      enemies.push({ x, y, size, speed, hp: baseHp, maxHp: baseHp, color, type });
+    }
+
+    // --- INPUT CONTROLS ---
+    const leftZone = document.getElementById('touch-left');
+    const rightZone = document.getElementById('touch-right');
+
+    function handleTouchStart(e, joy, zone) {
+      e.preventDefault();
+      for (let touch of e.changedTouches) {
+        if (!joy.active) {
+          joy.active = true;
+          joy.id = touch.identifier;
+          joy.startX = touch.clientX;
+          joy.startY = touch.clientY;
+          joy.curX = touch.clientX;
+          joy.curY = touch.clientY;
+        }
+      }
+    }
+
+    function handleTouchMove(e, joy) {
+      e.preventDefault();
+      for (let touch of e.changedTouches) {
+        if (joy.active && touch.identifier === joy.id) {
+          joy.curX = touch.clientX;
+          joy.curY = touch.clientY;
+          let dx = joy.curX - joy.startX;
+          let dy = joy.curY - joy.startY;
+          let dist = Math.hypot(dx, dy);
+          let maxDist = 50;
+          if (dist > 0) {
+            joy.dirX = (dx / dist) * Math.min(1, dist / maxDist);
+            joy.dirY = (dy / dist) * Math.min(1, dist / maxDist);
+          }
+        }
+      }
+    }
+
+    function handleTouchEnd(e, joy) {
+      e.preventDefault();
+      for (let touch of e.changedTouches) {
+        if (joy.active && touch.identifier === joy.id) {
+          joy.active = false;
+          joy.id = null;
+          joy.dirX = 0;
+          joy.dirY = 0;
+        }
+      }
+    }
+
+    leftZone.addEventListener('touchstart', e => handleTouchStart(e, joyLeft, leftZone));
+    leftZone.addEventListener('touchmove', e => handleTouchMove(e, joyLeft));
+    leftZone.addEventListener('touchend', e => handleTouchEnd(e, joyLeft));
+
+    rightZone.addEventListener('touchstart', e => handleTouchStart(e, joyRight, rightZone));
+    rightZone.addEventListener('touchmove', e => handleTouchMove(e, joyRight));
+    rightZone.addEventListener('touchend', e => handleTouchEnd(e, joyRight));
+
+    // --- MAIN GAME LOOP ---
+    function startMatch() {
+      audio.init();
+      gameActive = true;
+      isPaused = false;
+      kills = 0;
+      level = 1;
+      xp = 0;
+      xpToNext = 15;
+      matchTime = 0;
+      diffMult = 1.0;
+
+      // Reset Player
+      let equipped = SKINS.find(s => s.id === playerStats.equippedSkin) || SKINS[0];
+      player.x = canvas.width / 2;
+      player.y = canvas.height / 2;
+      player.hp = 100;
+      player.maxHp = 100;
+      player.speed = 4.2;
+      player.color = equipped.color;
+      player.weapon = { count: 1, spread: 0.02, fireRate: 14, damage: 15, speed: 10 };
+
+      bullets = [];
+      enemies = [];
+      particles = [];
+      floatTexts = [];
+
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+
+      if (matchTimerInterval) clearInterval(matchTimerInterval);
+      matchTimerInterval = setInterval(() => {
+        if (gameActive && !isPaused) {
+          matchTime++;
+          diffMult = 1.0 + (matchTime * 0.035); // Enemy Buff Over Time
+          document.getElementById('hud-mult').innerText = `x${diffMult.toFixed(2)}`;
+
+          if (matchTime % 25 === 0) {
+            triggerSurgeEvent();
+          }
+        }
+      }, 1000);
+
+      setInterval(spawnEnemy, 600);
+      requestAnimationFrame(gameLoop);
+    }
+
+    function triggerSurgeEvent() {
+      let banner = document.getElementById('surge-banner');
+      banner.classList.add('active');
+      setTimeout(() => banner.classList.remove('active'), 2500);
+
+      for (let i = 0; i < 6; i++) {
+        spawnEnemy();
+      }
+    }
+
+    function gameLoop() {
+      if (!gameActive) return;
+
+      if (!isPaused) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Player Move
+        player.x += joyLeft.dirX * player.speed;
+        player.y += joyLeft.dirY * player.speed;
+        player.x = Math.max(player.radius, Math.min(canvas.width - player.radius, player.x));
+        player.y = Math.max(player.radius, Math.min(canvas.height - player.radius, player.y));
+
+        // Player Shooting
+        if (player.cooldown > 0) player.cooldown--;
+        if (joyRight.active && Math.hypot(joyRight.dirX, joyRight.dirY) > 0.3 && player.cooldown <= 0) {
+          let angle = Math.atan2(joyRight.dirY, joyRight.dirX);
+          let wpn = player.weapon;
+          let startAngle = angle - ((wpn.count - 1) * wpn.spread) / 2;
+
+          for (let i = 0; i < wpn.count; i++) {
+            let curAngle = startAngle + i * wpn.spread;
+            bullets.push({
+              x: player.x,
+              y: player.y,
+              vx: Math.cos(curAngle) * wpn.speed,
+              vy: Math.sin(curAngle) * wpn.speed,
+              damage: wpn.damage * player.dmgMult,
+              radius: 4,
+              life: 90
+            });
+          }
+          audio.playShoot();
+          player.cooldown = Math.max(3, Math.floor(wpn.fireRate / player.rateMult));
+        }
+
+        // Draw Player Circle & Player HP Bar
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+        ctx.fillStyle = player.color;
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = player.color;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Player Overhead HP Bar
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(player.x - 16, player.y - player.radius - 10, 32, 5);
+        ctx.fillStyle = '#00ff88';
+        ctx.fillRect(player.x - 16, player.y - player.radius - 10, (player.hp / player.maxHp) * 32, 5);
+
+        // Bullets Logic
+        for (let i = bullets.length - 1; i >= 0; i--) {
+          let b = bullets[i];
+          b.x += b.vx;
+          b.y += b.vy;
+          b.life--;
+
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+          ctx.fillStyle = '#fffb00';
+          ctx.fill();
+
+          if (b.life <= 0 || b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) {
+            bullets.splice(i, 1);
+          }
+        }
+
+        // Enemies Logic
+        for (let i = enemies.length - 1; i >= 0; i--) {
+          let e = enemies[i];
+          let angle = Math.atan2(player.y - e.y, player.x - e.x);
+          e.x += Math.cos(angle) * e.speed;
+          e.y += Math.sin(angle) * e.speed;
+
+          // Render Square
+          ctx.fillStyle = e.color;
+          ctx.fillRect(e.x - e.size / 2, e.y - e.size / 2, e.size, e.size);
+
+          // Square Overhead HP Bar
+          if (e.hp < e.maxHp) {
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.fillRect(e.x - 12, e.y - e.size / 2 - 8, 24, 4);
+            ctx.fillStyle = '#ff3366';
+            ctx.fillRect(e.x - 12, e.y - e.size / 2 - 8, Math.max(0, (e.hp / e.maxHp) * 24), 4);
+          }
+
+          // Player Collision
+          if (Math.hypot(player.x - e.x, player.y - e.y) < player.radius + e.size / 2) {
+            player.hp -= 0.6 * diffMult;
+            if (player.hp <= 0) {
+              gameOver();
+              return;
+            }
+          }
+
+          // Bullet Collision
+          for (let j = bullets.length - 1; j >= 0; j--) {
+            let b = bullets[j];
+            if (b.x > e.x - e.size/2 && b.x < e.x + e.size/2 && b.y > e.y - e.size/2 && b.y < e.y + e.size/2) {
+              e.hp -= b.damage;
+              bullets.splice(j, 1);
+              audio.playHit();
+
+              if (e.hp <= 0) {
+                enemies.splice(i, 1);
+                kills++;
+                xp += 5;
+
+                if (xp >= xpToNext) {
+                  xp -= xpToNext;
+                  level++;
+                  xpToNext = Math.floor(xpToNext * 1.3);
+                  showUpgradeModal();
+                }
+                break;
+              }
+            }
+          }
+        }
+
+        // Update HUD
+        document.getElementById('hp-bar').style.width = `${Math.max(0, (player.hp / player.maxHp) * 100)}%`;
+        document.getElementById('xp-bar').style.width = `${Math.min(100, (xp / xpToNext) * 100)}%`;
+        document.getElementById('hud-lvl').innerText = level;
+        document.getElementById('hud-kills').innerText = kills;
+      }
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    function gameOver() {
+      gameActive = false;
+      if (matchTimerInterval) clearInterval(matchTimerInterval);
+
+      let earnedCoins = Math.floor(kills / 100);
+      playerStats.coins += earnedCoins;
+      playerStats.totalKills += kills;
+      if (kills > playerStats.bestKills) playerStats.bestKills = kills;
+      if (level > playerStats.maxLvl) playerStats.maxLvl = level;
+      if (matchTime > playerStats.maxTime) playerStats.maxTime = matchTime;
+
+      saveStats();
+
+      document.getElementById('go-kills').innerText = kills;
+      document.getElementById('go-coins').innerText = `+${earnedCoins}`;
+      document.getElementById('screen-gameover').classList.add('active');
+    }
+
+    // --- MENU INTERACTION LOGIC ---
+    document.querySelectorAll('.btn-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.btn-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.menu-panel').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(tab.dataset.target).classList.add('active');
+      });
+    });
+
+    document.getElementById('btn-start').addEventListener('click', startMatch);
+    document.getElementById('btn-retry').addEventListener('click', startMatch);
+    document.getElementById('btn-resume').addEventListener('click', () => {
+      isPaused = false;
+      document.getElementById('screen-pause').classList.remove('active');
+    });
+    document.getElementById('btn-pause').addEventListener('click', () => {
+      isPaused = true;
+      document.getElementById('screen-pause').classList.add('active');
+    });
+    document.getElementById('btn-restart').addEventListener('click', startMatch);
+    
+    function returnToMenu() {
+      gameActive = false;
+      if (matchTimerInterval) clearInterval(matchTimerInterval);
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById('screen-menu').classList.add('active');
+      updateMenuUI();
+    }
+
+    document.getElementById('btn-quit').addEventListener('click', returnToMenu);
+    document.getElementById('btn-go-menu').addEventListener('click', returnToMenu);
+
+    // Gacha Roll System
+    let previewIdx = 0;
+    function updateSkinPreview() {
+      let skin = SKINS[previewIdx];
+      let el = document.getElementById('skin-preview');
+      el.style.backgroundColor = skin.color;
+      document.getElementById('skin-name').innerText = skin.name;
+      document.getElementById('skin-rarity').innerText = skin.rarity;
+      document.getElementById('skin-rarity').style.color = skin.color;
+    }
+
+    document.getElementById('btn-roll').addEventListener('click', () => {
+      if (playerStats.coins >= 100) {
+        playerStats.coins -= 100;
+        let randomSkin = SKINS[Math.floor(Math.random() * SKINS.length)];
+        if (!playerStats.unlockedSkins.includes(randomSkin.id)) {
+          playerStats.unlockedSkins.push(randomSkin.id);
+        }
+        previewIdx = SKINS.findIndex(s => s.id === randomSkin.id);
+        updateSkinPreview();
+        saveStats();
+      } else {
+        alert("Not enough coins! Win 1 coin for every 100 kills.");
+      }
+    });
+
+    document.getElementById('btn-equip').addEventListener('click', () => {
+      let skin = SKINS[previewIdx];
+      if (playerStats.unlockedSkins.includes(skin.id)) {
+        playerStats.equippedSkin = skin.id;
+        saveStats();
+        alert(`Equipped ${skin.name}!`);
+      } else {
+        alert("Roll to unlock this skin first!");
+      }
+    });
+
+    // Init
+    loadSavedStats();
+    updateSkinPreview();
+  </script>
+</body>
+</html>
